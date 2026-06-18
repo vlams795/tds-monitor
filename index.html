@@ -156,15 +156,21 @@
 </footer>
 
 <script>
-  const USER = 'vlams795';   // ← ganti dengan username asli
-  const REPO = 'tds-monitor';         // ← ganti dengan nama repo asli
-// GitHub Contents API — selalu fresh, tidak kena cache CDN
-  const API  = `https://api.github.com/repos/${USER}/${REPO}/contents/data/sensor_data.json`;
+  const USER   = 'USERNAME_GITHUB_ANDA';   // ← ganti
+  const REPO   = 'NAMA_REPO_ANDA';         // ← ganti
+  const BRANCH = 'main';
+  const FILE   = 'data/sensor_data.json';
+
+  // Gunakan raw.githubusercontent.com dengan cache-bust agresif
+  function buildURL() {
+    return `https://raw.githubusercontent.com/${USER}/${REPO}/${BRANCH}/${FILE}`
+           + `?bust=${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  }
 
   let chart, lastSig = null;
   const QMAP = { MURNI:0, BAIK:1, SEDANG:2, LAYAK:3, BURUK:4 };
 
-  // ── Chart ───────────────────────────────────────────────────
+  // ── Chart ────────────────────────────────────────────────────
   function initChart() {
     chart = new Chart(document.getElementById('chart').getContext('2d'), {
       type: 'line',
@@ -192,15 +198,15 @@
     });
   }
 
-  // ── Helper ──────────────────────────────────────────────────
+  // ── Helper ───────────────────────────────────────────────────
   function rssiQ(r) {
-    if(r>=-50) return 'Sangat Baik';
-    if(r>=-60) return 'Baik';
-    if(r>=-70) return 'Cukup';
+    if (r >= -50) return 'Sangat Baik';
+    if (r >= -60) return 'Baik';
+    if (r >= -70) return 'Cukup';
     return 'Lemah';
   }
   function formatUptime(ms) {
-    const s=Math.floor(ms/1000), m=Math.floor(s/60), h=Math.floor(m/60);
+    const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
     return `${h}j ${m%60}m ${s%60}d`;
   }
   function setLoading(on) {
@@ -208,112 +214,103 @@
     document.getElementById('btn-icon').classList.toggle('spin', on);
   }
   function setQualityScale(label) {
-    for(let i=0;i<5;i++)
-      document.getElementById('sq-'+i).classList.remove('active');
+    for (let i = 0; i < 5; i++)
+      document.getElementById('sq-' + i).classList.remove('active');
     const idx = QMAP[label];
-    if(idx !== undefined)
-      document.getElementById('sq-'+idx).classList.add('active');
+    if (idx !== undefined)
+      document.getElementById('sq-' + idx).classList.add('active');
   }
 
-  // ── Fetch utama (dipanggil saat tombol ditekan) ─────────────
+  // ── Fetch utama ──────────────────────────────────────────────
   async function fetchData() {
-  setLoading(true);
-  document.getElementById('notif').style.display = 'none';
+    setLoading(true);
+    document.getElementById('notif').style.display = 'none';
 
-  try {
-    // GitHub Contents API — tambahkan header agar tidak kena cache
-    const res = await fetch(API, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+    try {
+      const res = await fetch(buildURL(), {
+        method: 'GET',
+        cache: 'no-store',      // paksa browser tidak gunakan cache
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma':        'no-cache',
+          'Expires':       '0'
+        }
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const data = await res.json();
+
+      // Deteksi perubahan
+      const sig     = `${data.tds_ppm}-${data.uptime_ms}`;
+      const changed = lastSig !== null && lastSig !== sig;
+      lastSig       = sig;
+
+      // Kartu utama
+      document.getElementById('val-tds').textContent  = Number(data.tds_ppm).toFixed(1);
+      document.getElementById('val-v').textContent    = Number(data.tds_voltage).toFixed(3);
+      document.getElementById('val-rssi').textContent = data.wifi_rssi ?? '—';
+
+      const qEl = document.getElementById('val-q');
+      qEl.textContent = data.water_quality || '—';
+      qEl.className   = 'val c-q q-' + (data.water_quality || '');
+
+      setQualityScale(data.water_quality);
+
+      // Info perangkat
+      document.getElementById('d-id').textContent   = (data.device_id  || '—').slice(-8);
+      document.getElementById('d-fw').textContent   = data.firmware    || '—';
+      document.getElementById('d-ip').textContent   = data.ip_address  || '—';
+      document.getElementById('d-up').textContent   = formatUptime(data.uptime_ms || 0);
+
+      // Info jaringan
+      document.getElementById('n-ssid').textContent = data.wifi_ssid  || '—';
+      document.getElementById('n-rssi').textContent = (data.wifi_rssi || '—') + ' dBm';
+      document.getElementById('n-qual').textContent = rssiQ(data.wifi_rssi);
+
+      // Chart
+      if (data.history && data.history.length > 0) {
+        const n = data.history.length;
+        chart.data.labels           = data.history.map((_, i) => 'T-' + (n - 1 - i));
+        chart.data.datasets[0].data = data.history.map(d => d.tds);
+        chart.update();
       }
-    });
 
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const apiResponse = await res.json();
+      // Status
+      document.getElementById('badge').textContent = 'Online';
+      document.getElementById('badge').className   = 'badge online';
+      document.getElementById('last-update').textContent =
+        'Data dimuat: ' + new Date().toLocaleString('id-ID') +
+        (changed ? ' · ✅ Data baru' : ' · Tidak ada perubahan');
 
-    // GitHub API mengembalikan konten dalam format Base64
-    // Decode Base64 → string JSON → parse
-    const decoded = atob(apiResponse.content.replace(/\n/g, ''));
-    const data    = JSON.parse(decoded);
-
-    // Deteksi perubahan data
-    const sig     = `${data.tds_ppm}-${data.uptime_ms}`;
-    const changed = lastSig !== null && lastSig !== sig;
-    lastSig       = sig;
-
-    // Isi kartu utama
-    document.getElementById('val-tds').textContent  = data.tds_ppm.toFixed(1);
-    document.getElementById('val-v').textContent    = data.tds_voltage.toFixed(3);
-    document.getElementById('val-rssi').textContent = data.wifi_rssi;
-
-    const qEl = document.getElementById('val-q');
-    qEl.textContent = data.water_quality;
-    qEl.className   = 'val c-q q-' + data.water_quality;
-
-    // Skala kualitas
-    setQualityScale(data.water_quality);
-
-    // Info perangkat
-    document.getElementById('d-id').textContent   = (data.device_id  || '—').slice(-8);
-    document.getElementById('d-fw').textContent   = data.firmware    || '—';
-    document.getElementById('d-ip').textContent   = data.ip_address  || '—';
-    document.getElementById('d-up').textContent   = formatUptime(data.uptime_ms || 0);
-
-    // Info jaringan
-    document.getElementById('n-ssid').textContent = data.wifi_ssid   || '—';
-    document.getElementById('n-rssi').textContent = (data.wifi_rssi  || '—') + ' dBm';
-    document.getElementById('n-qual').textContent = rssiQ(data.wifi_rssi);
-
-    // Chart historis
-    if (data.history && data.history.length > 0) {
-      const n = data.history.length;
-      chart.data.labels           = data.history.map((_, i) => 'T-' + (n - 1 - i));
-      chart.data.datasets[0].data = data.history.map(d => d.tds);
-      chart.update();
+    } catch (e) {
+      document.getElementById('badge').textContent = 'Offline';
+      document.getElementById('badge').className   = 'badge offline';
+      document.getElementById('last-update').textContent =
+        '⚠ Gagal memuat data: ' + e.message;
+      console.error('fetchData error:', e);
+    } finally {
+      setLoading(false);
     }
-
-    // Badge & timestamp
-    document.getElementById('badge').textContent = 'Online';
-    document.getElementById('badge').className   = 'badge online';
-    document.getElementById('last-update').textContent =
-      'Data dimuat: ' + new Date().toLocaleString('id-ID') +
-      (changed ? ' · ✅ Data baru' : ' · Tidak ada perubahan');
-
-  } catch (e) {
-    document.getElementById('badge').textContent = 'Offline';
-    document.getElementById('badge').className   = 'badge offline';
-    document.getElementById('last-update').textContent =
-      '⚠ Gagal memuat data: ' + e.message;
-  } finally {
-    setLoading(false);
   }
-}
 
-  // ── Silent check (hanya tampilkan notifikasi, tidak update UI) ─
+  // ── Silent check ─────────────────────────────────────────────
   async function silentCheck() {
-  try {
-    const res = await fetch(API, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Cache-Control': 'no-cache'
-      }
-    });
-    if (!res.ok) return;
-    const apiResponse = await res.json();
-    const decoded = atob(apiResponse.content.replace(/\n/g, ''));
-    const data    = JSON.parse(decoded);
-    const sig     = `${data.tds_ppm}-${data.uptime_ms}`;
-    if (lastSig !== null && lastSig !== sig)
-      document.getElementById('notif').style.display = 'block';
-  } catch (_) {}
-}
+    try {
+      const res = await fetch(buildURL(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const sig  = `${data.tds_ppm}-${data.uptime_ms}`;
+      if (lastSig !== null && lastSig !== sig)
+        document.getElementById('notif').style.display = 'block';
+    } catch (_) {}
+  }
 
   // ── Init ─────────────────────────────────────────────────────
   initChart();
-  fetchData();                      // Muat saat halaman dibuka
-  setInterval(silentCheck, 90000);  // Cek senyap tiap 90 detik
+  fetchData();
+  setInterval(silentCheck, 90000);
 </script>
-</body>
-</html>
