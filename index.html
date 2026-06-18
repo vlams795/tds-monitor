@@ -3,374 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TDS Monitor — ESP32</title>
+  <title>ESP32 TDS Monitor</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* ── Reset & Base ─────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #080c10;
-      --bg-card:   #0d1219;
-      --bg-hover:  #121820;
-      --border:    #1c2530;
-      --border-hi: #2a3848;
-      --text-1:    #e2eaf4;
-      --text-2:    #7a94b0;
-      --text-3:    #3d5268;
-      --accent:    #00d4ff;
-      --accent-dim:#003d4d;
-      --good:      #00e676;
-      --warn:      #ffb300;
-      --danger:    #ff3d57;
-      --purple:    #a78bfa;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text-1);
-      min-height: 100vh;
-      padding: 1.5rem;
-      line-height: 1.5;
-    }
-
-    /* ── Header ───────────────────────────────────────────── */
-    .header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 2rem;
-      padding-bottom: 1.25rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-left h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-1);
-      letter-spacing: -0.01em;
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-    }
-
-    .header-left h1 .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-      flex-shrink: 0;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: .5; transform: scale(.8); }
-    }
-
-    .header-left p {
-      font-size: .78rem;
-      color: var(--text-2);
-      margin-top: .3rem;
-    }
-
-    .header-right { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-
-    /* Badge Online/Offline */
-    .badge {
-      font-size: .7rem;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 99px;
-      letter-spacing: .04em;
-    }
-    .badge-online  { background: rgba(0,230,118,.12); color: var(--good);   border: 1px solid rgba(0,230,118,.3); }
-    .badge-offline { background: rgba(255,61,87,.12);  color: var(--danger); border: 1px solid rgba(255,61,87,.3); }
-    .badge-wait    { background: rgba(122,148,176,.1); color: var(--text-2); border: 1px solid var(--border); }
-
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;
+         color:#c9d1d9;min-height:100vh;padding:1.5rem}
+    header{display:flex;align-items:flex-start;justify-content:space-between;
+           flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}
+    header h1{font-size:1.35rem;color:#e6edf3;font-weight:600}
+    header p{font-size:.78rem;color:#8b949e;margin-top:4px}
+    .badge{display:inline-block;font-size:.7rem;padding:2px 10px;
+           border-radius:99px;margin-left:8px;vertical-align:middle}
+    .online{background:#0d4429;color:#3fb950}
+    .offline{background:#3d1c1c;color:#f85149}
     /* Tombol Refresh */
-    .btn-refresh {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-hi);
-      color: var(--text-1);
-      font-size: .82rem;
-      font-weight: 500;
-      padding: .45rem 1.1rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background .15s, border-color .15s, box-shadow .15s;
-      white-space: nowrap;
-    }
-    .btn-refresh:hover {
-      background: var(--bg-hover);
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-dim);
-    }
-    .btn-refresh:active { background: var(--bg); }
-    .btn-refresh.loading { opacity: .5; pointer-events: none; }
-    .spin { display: inline-block; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Notifikasi data baru ─────────────────────────────── */
-    .notif {
-      display: none;
-      align-items: center; gap: .6rem;
-      background: rgba(0,230,118,.07);
-      border: 1px solid rgba(0,230,118,.25);
-      border-radius: 8px;
-      padding: .7rem 1rem;
-      margin-bottom: 1.25rem;
-      font-size: .82rem;
-      color: var(--good);
-      cursor: pointer;
-      transition: background .15s;
-    }
-    .notif:hover { background: rgba(0,230,118,.12); }
-    .notif.show  { display: flex; }
-
-    /* ── Alert box (TDS tinggi) ───────────────────────────── */
-    .alert-box {
-      display: none;
-      align-items: center; gap: .75rem;
-      background: rgba(255,61,87,.08);
-      border: 1px solid rgba(255,61,87,.35);
-      border-radius: 10px;
-      padding: 1rem 1.2rem;
-      margin-bottom: 1.5rem;
-      font-size: .85rem;
-      color: var(--danger);
-    }
-    .alert-box.show { display: flex; }
-    .alert-box .alert-icon { font-size: 1.3rem; flex-shrink: 0; }
-    .alert-box strong { display: block; font-size: .9rem; margin-bottom: 2px; }
-
-    /* ── Kartu Utama ──────────────────────────────────────── */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-      gap: .85rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.2rem 1.1rem;
-      position: relative;
-      overflow: hidden;
-      transition: border-color .2s;
-    }
-    .card:hover { border-color: var(--border-hi); }
-    .card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: var(--card-accent, transparent);
-      border-radius: 12px 12px 0 0;
-    }
-    .card-tds  { --card-accent: var(--accent); }
-    .card-q    { --card-accent: var(--good); }
-    .card-v    { --card-accent: var(--purple); }
-    .card-rssi { --card-accent: var(--warn); }
-
-    .card-lbl {
-      font-size: .68rem;
-      font-weight: 600;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-bottom: .5rem;
-    }
-    .card-val {
-      font-size: 2.1rem;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: -0.02em;
-    }
-    .card-unit { font-size: .78rem; color: var(--text-2); margin-top: .25rem; }
-
-    .c-tds  { color: var(--accent); }
-    .c-v    { color: var(--purple); }
-    .c-rssi { color: var(--warn); }
-    .c-q    { font-size: 1.3rem !important; }
-
-    /* Warna label kualitas */
-    .q-MURNI  { color: #00e676; }
-    .q-BAIK   { color: #00d4ff; }
-    .q-SEDANG { color: #a78bfa; }
-    .q-LAYAK  { color: #ffb300; }
-    .q-BURUK  { color: #ff3d57; }
-
-    /* ── Skala Kualitas Air ───────────────────────────────── */
-    .scale-box {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.2rem;
-      margin-bottom: 1.5rem;
-    }
-    .section-title {
-      font-size: .72rem;
-      font-weight: 600;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-bottom: .85rem;
-    }
-    .scale { display: flex; gap: 5px; }
-    .scale-item {
-      flex: 1;
-      padding: 8px 4px;
-      border-radius: 7px;
-      text-align: center;
-      font-size: .67rem;
-      font-weight: 700;
-      letter-spacing: .03em;
-      opacity: .25;
-      transition: opacity .3s, transform .25s;
-      cursor: default;
-    }
-    .scale-item small { display: block; font-weight: 400; margin-top: 2px; opacity: .8; }
-    .scale-item.active { opacity: 1; transform: translateY(-3px); }
-    .s0 { background: rgba(0,230,118,.1);  color: #00e676; border: 1px solid rgba(0,230,118,.2); }
-    .s1 { background: rgba(0,212,255,.1);  color: #00d4ff; border: 1px solid rgba(0,212,255,.2); }
-    .s2 { background: rgba(167,139,250,.1);color: #a78bfa; border: 1px solid rgba(167,139,250,.2); }
-    .s3 { background: rgba(255,179,0,.1);  color: #ffb300; border: 1px solid rgba(255,179,0,.2); }
-    .s4 { background: rgba(255,61,87,.1);  color: #ff3d57; border: 1px solid rgba(255,61,87,.2); }
-
-    /* ── Chart ───────────────────────────────────────────── */
-    .chart-box {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.2rem;
-      margin-bottom: 1.5rem;
-    }
-    .chart-box canvas { display: block; }
-
-    /* ── Info Grid ───────────────────────────────────────── */
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: .85rem;
-      margin-bottom: 1.5rem;
-    }
-    .info-box {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.1rem;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: .78rem;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
-      gap: .5rem;
-    }
-    .info-row:last-child { border-bottom: none; }
-    .info-row .k { color: var(--text-2); flex-shrink: 0; }
-    .info-row .v {
-      color: var(--text-1);
-      font-weight: 500;
-      font-family: 'Consolas', 'SF Mono', monospace;
-      font-size: .76rem;
-      text-align: right;
-      word-break: break-all;
-    }
-
-    /* ── Footer ──────────────────────────────────────────── */
-    footer {
-      font-size: .7rem;
-      color: var(--text-3);
-      text-align: center;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-    }
-
-    /* ── Responsive ──────────────────────────────────────── */
-    @media (max-width: 480px) {
-      body { padding: 1rem; }
-      .card-val { font-size: 1.75rem; }
-      .scale-item { font-size: .6rem; padding: 6px 2px; }
-    }
-
-    /* ── Reduced motion ──────────────────────────────────── */
-    @media (prefers-reduced-motion: reduce) {
-      .dot, .spin { animation: none; }
-      .scale-item { transition: none; }
-    }
+    .btn-refresh{display:flex;align-items:center;gap:6px;background:#21262d;
+      border:1px solid #30363d;color:#e6edf3;font-size:.82rem;padding:.45rem 1rem;
+      border-radius:8px;cursor:pointer;transition:background .15s;white-space:nowrap}
+    .btn-refresh:hover{background:#30363d}
+    .btn-refresh.loading{opacity:.6;pointer-events:none}
+    .spin{display:inline-block;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    /* Notifikasi data baru */
+    .notif{background:#0d2d0d;border:1px solid #3fb950;border-radius:8px;
+      padding:.7rem 1rem;margin-bottom:1.2rem;font-size:.82rem;
+      color:#3fb950;display:none;cursor:pointer}
+    .notif:hover{background:#0f3b0f}
+    /* Cards */
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+           gap:1rem;margin-bottom:1.5rem}
+    .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:1.2rem}
+    .card .lbl{font-size:.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:.06em}
+    .card .val{font-size:2rem;font-weight:700;margin:4px 0 0;line-height:1}
+    .card .unit{font-size:.8rem;color:#8b949e}
+    .c-tds{color:#38bdf8}
+    .c-v{color:#4ade80}
+    .c-rssi{color:#a78bfa}
+    .c-q{font-size:1.3rem!important}
+    /* Warna kualitas */
+    .q-MURNI{color:#3fb950} .q-BAIK{color:#38bdf8}
+    .q-SEDANG{color:#a78bfa} .q-LAYAK{color:#f97316} .q-BURUK{color:#f85149}
+    /* Skala kualitas */
+    .scale-box{background:#161b22;border:1px solid #30363d;border-radius:10px;
+               padding:1.2rem;margin-bottom:1.5rem}
+    .scale-box h2{font-size:.82rem;color:#8b949e;margin-bottom:.75rem}
+    .scale{display:flex;gap:4px}
+    .scale-item{flex:1;padding:8px 4px;border-radius:6px;text-align:center;
+                font-size:.68rem;font-weight:600;opacity:.3;transition:opacity .3s,transform .2s}
+    .scale-item.active{opacity:1;transform:translateY(-2px)}
+    .s0{background:#0d2d0d;color:#3fb950} .s1{background:#0d2040;color:#38bdf8}
+    .s2{background:#1c1040;color:#a78bfa} .s3{background:#2d1a00;color:#f97316}
+    .s4{background:#2d0d0d;color:#f85149}
+    /* Chart */
+    .chart-box{background:#161b22;border:1px solid #30363d;border-radius:10px;
+               padding:1.2rem;margin-bottom:1.5rem}
+    .chart-box h2{font-size:.82rem;color:#8b949e;margin-bottom:.75rem}
+    /* Info grid */
+    .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+               gap:1rem;margin-bottom:1.5rem}
+    .info-box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:1rem}
+    .info-box h2{font-size:.78rem;color:#8b949e;margin-bottom:.7rem}
+    .info-row{display:flex;justify-content:space-between;font-size:.78rem;
+              padding:4px 0;border-bottom:1px solid #21262d}
+    .info-row:last-child{border-bottom:none}
+    .info-row .k{color:#8b949e}
+    .info-row .v{color:#e6edf3;font-weight:500;font-family:monospace}
+    footer{font-size:.7rem;color:#6e7681;text-align:center}
   </style>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────── -->
-<header class="header">
-  <div class="header-left">
-    <h1>
-      <span class="dot"></span>
-      TDS Water Monitor
+<header>
+  <div>
+    <h1>💧 ESP32 TDS Water Monitor
+      <span class="badge" id="badge">—</span>
     </h1>
-    <p id="last-update">Tekan tombol Refresh untuk memuat data terbaru.</p>
+    <p id="last-update">Tekan tombol refresh untuk memuat data terbaru.</p>
   </div>
-  <div class="header-right">
-    <span class="badge badge-wait" id="badge">Menunggu</span>
-    <button class="btn-refresh" id="btn-refresh" onclick="fetchData()">
-      <span id="btn-icon">↻</span> Refresh Data
-    </button>
-  </div>
+  <button class="btn-refresh" id="btn-refresh" onclick="fetchData()">
+    <span id="btn-icon">↻</span> Refresh Data
+  </button>
 </header>
 
-<!-- ── Notifikasi data baru ─────────────────────────────────── -->
 <div class="notif" id="notif" onclick="fetchData()">
-  <span>🔄</span>
-  <span>Data baru tersedia dari ESP32 — klik untuk memuat ulang</span>
+  🔄 Data baru tersedia dari ESP32 — klik untuk memuat ulang
 </div>
 
-<!-- ── Alert TDS tinggi ─────────────────────────────────────── -->
-<div class="alert-box" id="alert-box">
-  <span class="alert-icon">⚠️</span>
-  <div>
-    <strong>Peringatan: Kualitas Air di Luar Batas Aman</strong>
-    Nilai TDS melebihi 300 ppm. Periksa kondisi air segera.
-  </div>
-</div>
-
-<!-- ── Kartu Utama ──────────────────────────────────────────── -->
+<!-- Kartu Utama -->
 <div class="cards">
-  <div class="card card-tds">
-    <div class="card-lbl">Nilai TDS</div>
-    <div class="card-val c-tds" id="val-tds">—</div>
-    <div class="card-unit">ppm</div>
+  <div class="card">
+    <div class="lbl">Nilai TDS</div>
+    <div class="val c-tds" id="val-tds">—</div>
+    <div class="unit">ppm</div>
   </div>
-  <div class="card card-q">
-    <div class="card-lbl">Kualitas Air</div>
-    <div class="card-val c-q" id="val-q">—</div>
-    <div class="card-unit">Status</div>
+  <div class="card">
+    <div class="lbl">Kualitas Air</div>
+    <div class="val c-q" id="val-q">—</div>
+    <div class="unit">Status</div>
   </div>
-  <div class="card card-v">
-    <div class="card-lbl">Tegangan Sensor</div>
-    <div class="card-val c-v" id="val-v">—</div>
-    <div class="card-unit">Volt</div>
+  <div class="card">
+    <div class="lbl">Tegangan Sensor</div>
+    <div class="val c-v" id="val-v">—</div>
+    <div class="unit">Volt</div>
   </div>
-  <div class="card card-rssi">
-    <div class="card-lbl">WiFi RSSI</div>
-    <div class="card-val c-rssi" id="val-rssi">—</div>
-    <div class="card-unit">dBm</div>
+  <div class="card">
+    <div class="lbl">WiFi RSSI</div>
+    <div class="val c-rssi" id="val-rssi">—</div>
+    <div class="unit">dBm</div>
   </div>
 </div>
 
-<!-- ── Skala Kualitas ───────────────────────────────────────── -->
+<!-- Skala Kualitas -->
 <div class="scale-box">
-  <div class="section-title">Skala Kualitas Air — WHO / SNI 01-3553-2006</div>
+  <h2>Skala Kualitas Air (WHO / SNI 01-3553-2006)</h2>
   <div class="scale">
     <div class="scale-item s0" id="sq-0">MURNI<br><small>&lt;50 ppm</small></div>
     <div class="scale-item s1" id="sq-1">BAIK<br><small>50–150</small></div>
@@ -380,263 +126,174 @@
   </div>
 </div>
 
-<!-- ── Chart ────────────────────────────────────────────────── -->
+<!-- Chart -->
 <div class="chart-box">
-  <div class="section-title" style="margin-bottom:.85rem">Tren TDS — 10 Pembacaan Terakhir</div>
+  <h2>Tren TDS — 10 Pembacaan Terakhir</h2>
   <canvas id="chart" height="90"></canvas>
 </div>
 
-<!-- ── Info Grid ────────────────────────────────────────────── -->
+<!-- Info -->
 <div class="info-grid">
   <div class="info-box">
-    <div class="section-title">Informasi Perangkat</div>
-    <div class="info-row"><span class="k">Device ID</span>  <span class="v" id="d-id">—</span></div>
-    <div class="info-row"><span class="k">Firmware</span>   <span class="v" id="d-fw">—</span></div>
-    <div class="info-row"><span class="k">IP Address</span> <span class="v" id="d-ip">—</span></div>
-    <div class="info-row"><span class="k">Uptime</span>     <span class="v" id="d-up">—</span></div>
+    <h2>Informasi Perangkat</h2>
+    <div class="info-row"><span class="k">Device ID</span><span class="v" id="d-id">—</span></div>
+    <div class="info-row"><span class="k">Firmware</span><span class="v" id="d-fw">—</span></div>
+    <div class="info-row"><span class="k">IP Address</span><span class="v" id="d-ip">—</span></div>
+    <div class="info-row"><span class="k">Uptime</span><span class="v" id="d-up">—</span></div>
   </div>
   <div class="info-box">
-    <div class="section-title">Informasi Jaringan</div>
-    <div class="info-row"><span class="k">SSID</span>            <span class="v" id="n-ssid">—</span></div>
-    <div class="info-row"><span class="k">RSSI</span>            <span class="v" id="n-rssi">—</span></div>
-    <div class="info-row"><span class="k">Kualitas Sinyal</span> <span class="v" id="n-qual">—</span></div>
-    <div class="info-row"><span class="k">Upload interval</span> <span class="v">60 detik</span></div>
+    <h2>Informasi Jaringan</h2>
+    <div class="info-row"><span class="k">SSID</span><span class="v" id="n-ssid">—</span></div>
+    <div class="info-row"><span class="k">RSSI</span><span class="v" id="n-rssi">—</span></div>
+    <div class="info-row"><span class="k">Kualitas Sinyal</span><span class="v" id="n-qual">—</span></div>
+    <div class="info-row"><span class="k">Upload interval</span><span class="v">60 detik</span></div>
   </div>
 </div>
 
-<!-- ── Footer ───────────────────────────────────────────────── -->
 <footer>
-  ESP32 TDS Monitor &bull; Data diperbarui setiap 60 detik &bull;
+  Data diperbarui ESP32 setiap 60 detik &bull;
   Tidak ada auto-refresh — gunakan tombol ↻ di atas
 </footer>
 
-<!-- ── JavaScript ────────────────────────────────────────────── -->
 <script>
-  // ============================================================
-  //  KONFIGURASI — ganti sesuai akun GitHub Anda
-  // ============================================================
-  const USER   = 'vlams795';       // ← username GitHub
-  const REPO   = 'tds-monitor';    // ← nama repositori
-  const BRANCH = 'main';
-  const FILE   = 'data/sensor_data.json';
+  const USER = 'vlams795';
+  const REPO = 'tds-monitor';
+  const RAW  = `https://raw.githubusercontent.com/${USER}/${REPO}/main/data/sensor_data.json`;
 
-  // URL raw dengan cache-bust agresif
-  function buildURL() {
-    return `https://raw.githubusercontent.com/${USER}/${REPO}/${BRANCH}/${FILE}`
-           + `?bust=${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  }
-
-  // ============================================================
-  //  State
-  // ============================================================
   let chart, lastSig = null;
   const QMAP = { MURNI:0, BAIK:1, SEDANG:2, LAYAK:3, BURUK:4 };
 
-  // ============================================================
-  //  Chart.js
-  // ============================================================
+  // ── Chart ───────────────────────────────────────────────────
   function initChart() {
-    const ctx = document.getElementById('chart').getContext('2d');
-    chart = new Chart(ctx, {
+    chart = new Chart(document.getElementById('chart').getContext('2d'), {
       type: 'line',
       data: {
         labels: [],
         datasets: [{
           label: 'TDS (ppm)',
           data: [],
-          borderColor: '#00d4ff',
-          backgroundColor: 'rgba(0,212,255,0.07)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true,
-          pointRadius: 5,
-          pointBackgroundColor: '#00d4ff',
-          pointBorderColor: '#080c10',
-          pointBorderWidth: 2,
-          pointHoverRadius: 7
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.1)',
+          tension: 0.4, fill: true, pointRadius: 5,
+          pointBackgroundColor: '#38bdf8'
         }]
       },
       options: {
         responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { labels: { color: '#7a94b0', font: { size: 11 } } },
-          tooltip: {
-            backgroundColor: '#0d1219',
-            borderColor: '#1c2530',
-            borderWidth: 1,
-            titleColor: '#e2eaf4',
-            bodyColor: '#7a94b0',
-            callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)} ppm` }
-          }
-        },
+        plugins: { legend: { labels: { color:'#8b949e', font:{size:11} } } },
         scales: {
-          x: {
-            ticks: { color: '#3d5268', font: { size: 10 } },
-            grid:  { color: '#0f1820' }
-          },
-          y: {
-            min: 0,
-            ticks: {
-              color: '#3d5268',
-              font: { size: 10 },
-              callback: v => v + ' ppm'
-            },
-            grid: { color: '#0f1820' }
-          }
+          x: { ticks:{color:'#6e7681',font:{size:10}}, grid:{color:'#21262d'} },
+          y: { min:0,
+               ticks:{color:'#6e7681',font:{size:10},callback:v=>v+' ppm'},
+               grid:{color:'#21262d'} }
         }
       }
     });
   }
 
-  // ============================================================
-  //  Helper
-  // ============================================================
+  // ── Helper ──────────────────────────────────────────────────
   function rssiQ(r) {
-    if (r >= -50) return 'Sangat Baik';
-    if (r >= -60) return 'Baik';
-    if (r >= -70) return 'Cukup';
+    if(r>=-50) return 'Sangat Baik';
+    if(r>=-60) return 'Baik';
+    if(r>=-70) return 'Cukup';
     return 'Lemah';
   }
-
   function formatUptime(ms) {
-    const s = Math.floor(ms / 1000);
-    const m = Math.floor(s / 60);
-    const h = Math.floor(m / 60);
-    return `${h}j ${m % 60}m ${s % 60}d`;
+    const s=Math.floor(ms/1000), m=Math.floor(s/60), h=Math.floor(m/60);
+    return `${h}j ${m%60}m ${s%60}d`;
   }
-
   function setLoading(on) {
     document.getElementById('btn-refresh').classList.toggle('loading', on);
-    const icon = document.getElementById('btn-icon');
-    if (on) icon.classList.add('spin');
-    else    icon.classList.remove('spin');
+    document.getElementById('btn-icon').classList.toggle('spin', on);
   }
-
   function setQualityScale(label) {
-    for (let i = 0; i < 5; i++)
-      document.getElementById('sq-' + i).classList.remove('active');
+    for(let i=0;i<5;i++)
+      document.getElementById('sq-'+i).classList.remove('active');
     const idx = QMAP[label];
-    if (idx !== undefined)
-      document.getElementById('sq-' + idx).classList.add('active');
+    if(idx !== undefined)
+      document.getElementById('sq-'+idx).classList.add('active');
   }
 
-  function setBadge(state) {
-    const el = document.getElementById('badge');
-    if (state === 'online') {
-      el.textContent = 'Online';
-      el.className   = 'badge badge-online';
-    } else if (state === 'offline') {
-      el.textContent = 'Offline';
-      el.className   = 'badge badge-offline';
-    } else {
-      el.textContent = 'Menunggu';
-      el.className   = 'badge badge-wait';
-    }
-  }
-
-  // ============================================================
-  //  Fetch Data Utama
-  // ============================================================
+  // ── Fetch utama (dipanggil saat tombol ditekan) ─────────────
   async function fetchData() {
     setLoading(true);
-    document.getElementById('notif').classList.remove('show');
+    document.getElementById('notif').style.display = 'none';
 
     try {
-      const res = await fetch(buildURL(), {
-        method: 'GET',
-        cache:  'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma':        'no-cache',
-          'Expires':       '0'
-        }
-      });
-
+      // cache-bust: tambahkan timestamp agar browser tidak pakai cache lama
+      const res = await fetch(RAW + '?nc=' + Date.now());
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
 
-      // Deteksi perubahan
+      // Deteksi perubahan data
       const sig     = `${data.tds_ppm}-${data.uptime_ms}`;
       const changed = lastSig !== null && lastSig !== sig;
       lastSig       = sig;
 
-      // ── Kartu utama ────────────────────────────────────────
-      document.getElementById('val-tds').textContent  = Number(data.tds_ppm   || 0).toFixed(1);
-      document.getElementById('val-v').textContent    = Number(data.tds_voltage|| 0).toFixed(3);
-      document.getElementById('val-rssi').textContent = data.wifi_rssi ?? '—';
+      // Isi kartu
+      document.getElementById('val-tds').textContent  = data.tds_ppm.toFixed(1);
+      document.getElementById('val-v').textContent    = data.tds_voltage.toFixed(3);
+      document.getElementById('val-rssi').textContent = data.wifi_rssi;
 
       const qEl = document.getElementById('val-q');
-      qEl.textContent = data.water_quality || '—';
-      qEl.className   = 'card-val c-q q-' + (data.water_quality || '');
+      qEl.textContent = data.water_quality;
+      qEl.className   = 'val c-q q-' + data.water_quality;
 
-      // ── Alert box ──────────────────────────────────────────
-      const alertBox = document.getElementById('alert-box');
-      if (data.alert_active) alertBox.classList.add('show');
-      else                    alertBox.classList.remove('show');
-
-      // ── Skala kualitas ─────────────────────────────────────
+      // Skala kualitas
       setQualityScale(data.water_quality);
 
-      // ── Info perangkat ─────────────────────────────────────
-      document.getElementById('d-id').textContent = (data.device_id   || '—').slice(-8);
-      document.getElementById('d-fw').textContent =  data.firmware    || '—';
-      document.getElementById('d-ip').textContent =  data.ip_address  || '—';
-      document.getElementById('d-up').textContent =  formatUptime(data.uptime_ms || 0);
+      // Info perangkat
+      document.getElementById('d-id').textContent   = (data.device_id||'—').slice(-8);
+      document.getElementById('d-fw').textContent   = data.firmware   || '—';
+      document.getElementById('d-ip').textContent   = data.ip_address || '—';
+      document.getElementById('d-up').textContent   = formatUptime(data.uptime_ms||0);
 
-      // ── Info jaringan ──────────────────────────────────────
-      document.getElementById('n-ssid').textContent =  data.wifi_ssid   || '—';
-      document.getElementById('n-rssi').textContent = (data.wifi_rssi   || '—') + ' dBm';
-      document.getElementById('n-qual').textContent =  rssiQ(data.wifi_rssi);
+      // Info jaringan
+      document.getElementById('n-ssid').textContent = data.wifi_ssid || '—';
+      document.getElementById('n-rssi').textContent = (data.wifi_rssi||'—') + ' dBm';
+      document.getElementById('n-qual').textContent = rssiQ(data.wifi_rssi);
 
-      // ── Chart historis ─────────────────────────────────────
+      // Chart historis
       if (data.history && data.history.length > 0) {
         const n = data.history.length;
-        chart.data.labels           = data.history.map((_, i) => 'T-' + (n - 1 - i));
-        chart.data.datasets[0].data = data.history.map(d => d.tds || 0);
-        chart.update('active');
+        chart.data.labels            = data.history.map((_,i)=>'T-'+(n-1-i));
+        chart.data.datasets[0].data  = data.history.map(d=>d.tds);
+        chart.update();
       }
 
-      // ── Status bar ─────────────────────────────────────────
-      setBadge('online');
+      // Badge & status
+      document.getElementById('badge').textContent = 'Online';
+      document.getElementById('badge').className   = 'badge online';
       document.getElementById('last-update').textContent =
-        'Diperbarui: ' + new Date().toLocaleString('id-ID') +
+        'Data dimuat: ' + new Date().toLocaleString('id-ID') +
         (changed ? ' · ✅ Data baru' : ' · Tidak ada perubahan');
 
-    } catch (e) {
-      setBadge('offline');
+    } catch(e) {
+      document.getElementById('badge').textContent = 'Offline';
+      document.getElementById('badge').className   = 'badge offline';
       document.getElementById('last-update').textContent =
         '⚠ Gagal memuat data: ' + e.message;
-      console.error('[TDS Monitor] fetchData error:', e);
     } finally {
       setLoading(false);
     }
   }
 
-  // ============================================================
-  //  Silent Check (setiap 90 detik — hanya tampilkan notifikasi)
-  // ============================================================
+  // ── Silent check (hanya tampilkan notifikasi, tidak update UI) ─
   async function silentCheck() {
     try {
-      const res = await fetch(buildURL(), {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
+      const res  = await fetch(RAW + '?nc=' + Date.now());
       if (!res.ok) return;
       const data = await res.json();
       const sig  = `${data.tds_ppm}-${data.uptime_ms}`;
       if (lastSig !== null && lastSig !== sig)
-        document.getElementById('notif').classList.add('show');
-    } catch (_) {}
+        document.getElementById('notif').style.display = 'block';
+    } catch(_) {}
   }
 
-  // ============================================================
-  //  Init
-  // ============================================================
+  // ── Init ─────────────────────────────────────────────────────
   initChart();
-  fetchData();
-  setInterval(silentCheck, 90000);
+  fetchData();                      // Muat saat halaman dibuka
+  setInterval(silentCheck, 90000);  // Cek senyap tiap 90 detik
 </script>
-
 </body>
 </html>
