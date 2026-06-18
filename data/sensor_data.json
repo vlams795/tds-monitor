@@ -2,64 +2,64 @@
   "device_id": "70:4B:CA:27:5C:2C",
   "device_name": "ESP32-TDS-Monitor",
   "firmware": "v2.1.0",
-  "tds_ppm": 0,
-  "tds_voltage": 0,
-  "water_quality": "MURNI",
+  "tds_ppm": 220.9,
+  "tds_voltage": 0.587,
+  "water_quality": "SEDANG",
   "alert_active": false,
   "wifi_ssid": "Redmi Note 10 Pro",
-  "wifi_rssi": -20,
+  "wifi_rssi": -25,
   "ip_address": "10.152.195.52",
-  "uptime_ms": 120410,
+  "uptime_ms": 180410,
   "history": [
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 110702
+      "tds": 221.7803,
+      "volt": 0.589084,
+      "t": 177122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 112702
+      "tds": 220.9403,
+      "volt": 0.586667,
+      "t": 179122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 114702
+      "tds": 228.2167,
+      "volt": 0.607619,
+      "t": 161122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 116702
+      "tds": 223.4599,
+      "volt": 0.593919,
+      "t": 163122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 118702
+      "tds": 224.8593,
+      "volt": 0.597949,
+      "t": 165122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 100702
+      "tds": 225.4189,
+      "volt": 0.59956,
+      "t": 167122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 102702
+      "tds": 221.7803,
+      "volt": 0.589084,
+      "t": 169122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 104702
+      "tds": 220.3803,
+      "volt": 0.585055,
+      "t": 171122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 106702
+      "tds": 222.3402,
+      "volt": 0.590696,
+      "t": 173122
     },
     {
-      "tds": 0,
-      "volt": 0,
-      "t": 108702
+      "tds": 217.8593,
+      "volt": 0.577802,
+      "t": 175122
     }
   ]
 }
