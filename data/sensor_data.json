@@ -1,0 +1,14 @@
+{
+  "device_id": "00:00:00:00:00:00",
+  "device_name": "ESP32-TDS-Monitor",
+  "firmware": "v2.1.0",
+  "tds_ppm": 0.0,
+  "tds_voltage": 0.000,
+  "water_quality": "UNKNOWN",
+  "alert_active": false,
+  "wifi_ssid": "",
+  "wifi_rssi": 0,
+  "ip_address": "0.0.0.0",
+  "uptime_ms": 0,
+  "history": []
+}
