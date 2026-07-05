@@ -7,59 +7,59 @@
   "water_quality": "MURNI",
   "alert_active": false,
   "wifi_ssid": "Redmi Note 10 Pro",
-  "wifi_rssi": -33,
+  "wifi_rssi": -42,
   "ip_address": "10.235.245.52",
-  "uptime_ms": 60410,
+  "uptime_ms": 120410,
   "history": [
     {
       "tds": 0,
       "volt": 0,
-      "t": 45914
+      "t": 112291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 47914
+      "t": 114291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 49914
+      "t": 116291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 51914
+      "t": 118291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 53914
+      "t": 100291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 55914
+      "t": 102291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 57914
+      "t": 104291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 59914
+      "t": 106291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 41914
+      "t": 108291
     },
     {
       "tds": 0,
       "volt": 0,
-      "t": 43914
+      "t": 110291
     }
   ]
 }
